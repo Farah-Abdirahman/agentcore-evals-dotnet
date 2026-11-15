@@ -68,19 +68,20 @@ fi
 RESULTS_LOG_GROUP=$(aws bedrock-agentcore-control get-online-evaluation-config --region "$REGION" \
   --online-evaluation-config-id "$CONFIG_ID" --query outputConfig.cloudWatchConfig.logGroupName --output text)
 
-# 4. Alarm on quality ----------------------------------------------------------------------------
+# 4. Alarm on quality (GoalSuccessRate: in testing it was the online signal that dropped when the agent
+#    stopped using tools; Correctness without ground truth accepted the guessed answers) ----------------------------------------------------------------------------
 # Scores are published as metrics in Bedrock-AgentCore/Evaluations, metric name = evaluator id. Online scores carry
 # onlineEvaluationConfigId + service.name; alarming on both keeps batch-job scores out of the production signal.
 aws cloudwatch put-metric-alarm --region "$REGION" \
-  --alarm-name "jozi-agent-correctness-drop" \
-  --alarm-description "Average Correctness of sampled production sessions fell below 0.7" \
+  --alarm-name "jozi-agent-goal-success-drop" \
+  --alarm-description "Average GoalSuccessRate of sampled production sessions fell below 0.8" \
   --namespace "Bedrock-AgentCore/Evaluations" \
-  --metric-name "Builtin.Correctness" \
+  --metric-name "Builtin.GoalSuccessRate" \
   --dimensions "Name=onlineEvaluationConfigId,Value=$CONFIG_ID" "Name=service.name,Value=$SERVICE_NAME" \
   --statistic Average --period 300 --evaluation-periods 1 \
-  --threshold 0.7 --comparison-operator LessThanThreshold \
+  --threshold 0.8 --comparison-operator LessThanThreshold \
   --treat-missing-data notBreaching
-echo "Alarm jozi-agent-correctness-drop configured (add --alarm-actions <sns-topic-arn> to get paged)."
+echo "Alarm jozi-agent-goal-success-drop configured (add --alarm-actions <sns-topic-arn> to get paged)."
 
 cat <<EOF
 

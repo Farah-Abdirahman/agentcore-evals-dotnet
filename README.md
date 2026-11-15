@@ -151,7 +151,7 @@ It prints the **results log group**.
 
 > **Already set up in the demo account (us-east-1, created 2026-11-14):**
 > online evaluation config `jozi_travel_agent_online-g6h6TqFIH0` (ACTIVE, 100% sampling, 1-minute timeout),
-> IAM role `JoziOnlineEvaluationRole`, alarm `jozi-agent-correctness-drop`,
+> IAM role `JoziOnlineEvaluationRole`, alarm `jozi-agent-goal-success-drop`,
 > results log group `/aws/bedrock-agentcore/evaluations/results/jozi_travel_agent_online-g6h6TqFIH0`.
 
 Then:
@@ -170,9 +170,14 @@ dotnet run --project src/Jozi.TravelAgent.Evals -- drift --results-log-group <re
 Show:
 
 * the drift table (baseline vs recent, delta, sessions) and the lowest-scoring recent sessions with the judge's explanation
-* CloudWatch → Metrics → `Bedrock-AgentCore/Evaluations` → `Builtin.Correctness` by `service.name`
-* the `jozi-agent-correctness-drop` alarm (wire `--alarm-actions` to SNS to get paged)
+* CloudWatch → Metrics → `Bedrock-AgentCore/Evaluations` → `Builtin.GoalSuccessRate` by `onlineEvaluationConfigId, service.name`
+* the `jozi-agent-goal-success-drop` alarm (wire `--alarm-actions` to SNS to get paged)
 * the AgentCore console → Evaluations → online configuration, with per-session results
+
+What drifts (measured): with the bad v1.1 config, online **GoalSuccessRate fell from 1.00 to 0.70** (the judge: "a
+convert_currency tool was available… but the assistant did not call it"), while **Correctness stayed at 1.00**. Without
+an answer key, the judge accepts a plausible guessed rate. So the alarm watches GoalSuccessRate, and ground-truth
+Correctness belongs in the CI gate.
 
 Timing (measured): online scores land about **6–7 minutes** after a session ends (1-minute session timeout, plus a
 5-minute discovery poll, plus scoring). So run the "v1.1" traffic at least 10 minutes before Demo 3, ideally at the
@@ -219,7 +224,7 @@ Observability dashboard.
 
 ```bash
 aws bedrock-agentcore-control delete-online-evaluation-config --online-evaluation-config-id jozi_travel_agent_online-g6h6TqFIH0
-aws cloudwatch delete-alarms --alarm-names jozi-agent-correctness-drop
+aws cloudwatch delete-alarms --alarm-names jozi-agent-goal-success-drop
 aws iam delete-role-policy --role-name JoziOnlineEvaluationRole --policy-name online-evaluation
 aws iam delete-role --role-name JoziOnlineEvaluationRole
 aws logs delete-log-group --log-group-name /aws/bedrock-agentcore/evals-demo/dotnet-travel-agent
